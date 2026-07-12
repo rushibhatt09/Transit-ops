@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, Search, Pencil, Trash2, ArrowUpDown } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, ArrowUpDown, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { format } from 'date-fns'
 import { api, getErrorMessage } from '../lib/api'
-import { Vehicle } from '../types'
+import { Vehicle, Trip, MaintenanceLog, FuelLog, Expense } from '../types'
 import { useAuth } from '../context/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import Modal from '../components/Modal'
@@ -11,6 +12,16 @@ import { SkeletonTable } from '../components/Skeleton'
 import { primaryBtn, secondaryBtn, dangerBtn, inputClass, labelClass, cardClass, thClass, tdClass, staggerContainer, staggerItem } from '../components/ui'
 
 const STATUS_OPTIONS = ['AVAILABLE', 'ON_TRIP', 'IN_SHOP', 'RETIRED']
+
+const DETAIL_TABS = ['Trips', 'Maintenance', 'Fuel'] as const
+type DetailTab = (typeof DETAIL_TABS)[number]
+
+interface VehicleDetail extends Vehicle {
+  trips: Trip[]
+  maintenance: MaintenanceLog[]
+  fuelLogs: FuelLog[]
+  expenses: Expense[]
+}
 
 const emptyForm = {
   registrationNumber: '',
@@ -37,6 +48,9 @@ export default function Vehicles() {
   const [editing, setEditing] = useState<Vehicle | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [viewing, setViewing] = useState<Vehicle | null>(null)
+  const [detail, setDetail] = useState<VehicleDetail | null>(null)
+  const [detailTab, setDetailTab] = useState<DetailTab>('Trips')
 
   function load() {
     api.get<Vehicle[]>('/vehicles').then((res) => {
@@ -119,6 +133,19 @@ export default function Vehicles() {
     }
   }
 
+  function openDetail(v: Vehicle) {
+    setViewing(v)
+    setDetail(null)
+    setDetailTab('Trips')
+    api
+      .get<VehicleDetail>(`/vehicles/${v.id}`)
+      .then((res) => setDetail(res.data))
+      .catch((err) => {
+        toast.error(getErrorMessage(err))
+        setViewing(null)
+      })
+  }
+
   async function handleDelete(v: Vehicle) {
     if (!confirm(`Delete vehicle ${v.registrationNumber}?`)) return
     try {
@@ -194,7 +221,7 @@ export default function Vehicles() {
                     </button>
                   </th>
                 ))}
-                {canWrite && <th className={thClass}>Actions</th>}
+                <th className={thClass}>Actions</th>
               </tr>
             </thead>
             <motion.tbody
@@ -215,18 +242,23 @@ export default function Vehicles() {
                   <td className={tdClass}>
                     <StatusBadge status={v.status} />
                   </td>
-                  {canWrite && (
-                    <td className={tdClass}>
-                      <div className="flex gap-2">
-                        <button onClick={() => openEdit(v)} className="text-gray-500 hover:text-brand-600">
-                          <Pencil size={16} />
-                        </button>
-                        <button onClick={() => handleDelete(v)} className="text-gray-500 hover:text-red-600">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  )}
+                  <td className={tdClass}>
+                    <div className="flex gap-2">
+                      <button title="View details" onClick={() => openDetail(v)} className="text-gray-500 hover:text-brand-600">
+                        <Eye size={16} />
+                      </button>
+                      {canWrite && (
+                        <>
+                          <button onClick={() => openEdit(v)} className="text-gray-500 hover:text-brand-600">
+                            <Pencil size={16} />
+                          </button>
+                          <button onClick={() => handleDelete(v)} className="text-gray-500 hover:text-red-600">
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
                 </motion.tr>
               ))}
               {filtered.length === 0 && (
@@ -295,6 +327,137 @@ export default function Vehicles() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {viewing && (
+        <Modal title={`${viewing.registrationNumber} — ${viewing.name}`} onClose={() => setViewing(null)} wide>
+          {!detail ? (
+            <SkeletonTable rows={4} cols={4} />
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Odometer</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{detail.odometer.toLocaleString()} km</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Max Load</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{detail.maxLoadCapacity.toLocaleString()} kg</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Acquisition Cost</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">₹{detail.acquisitionCost.toLocaleString()}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Region</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{detail.region}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-3 flex flex-col gap-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                  <StatusBadge status={detail.status} />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                {DETAIL_TABS.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setDetailTab(t)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                      detailTab === t ? 'bg-brand-600 text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+
+              <div className="overflow-x-auto">
+                {detailTab === 'Trips' &&
+                  (detail.trips.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-gray-400">No trips recorded for this vehicle.</p>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="border-b border-gray-200 dark:border-gray-800">
+                        <tr>
+                          <th className={thClass}>Route</th>
+                          <th className={thClass}>Driver</th>
+                          <th className={thClass}>Status</th>
+                          <th className={thClass}>Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {detail.trips.map((t) => (
+                          <tr key={t.id}>
+                            <td className={`${tdClass} font-medium`}>
+                              {t.source} → {t.destination}
+                            </td>
+                            <td className={tdClass}>{t.driver?.name || '—'}</td>
+                            <td className={tdClass}>
+                              <StatusBadge status={t.status} />
+                            </td>
+                            <td className={tdClass}>{format(new Date(t.createdAt), 'dd MMM yyyy')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ))}
+
+                {detailTab === 'Maintenance' &&
+                  (detail.maintenance.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-gray-400">No maintenance history for this vehicle.</p>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="border-b border-gray-200 dark:border-gray-800">
+                        <tr>
+                          <th className={thClass}>Description</th>
+                          <th className={thClass}>Cost</th>
+                          <th className={thClass}>Status</th>
+                          <th className={thClass}>Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {detail.maintenance.map((m) => (
+                          <tr key={m.id}>
+                            <td className={`${tdClass} font-medium`}>{m.description}</td>
+                            <td className={tdClass}>₹{m.cost.toLocaleString()}</td>
+                            <td className={tdClass}>
+                              <StatusBadge status={m.status} />
+                            </td>
+                            <td className={tdClass}>{format(new Date(m.date), 'dd MMM yyyy')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ))}
+
+                {detailTab === 'Fuel' &&
+                  (detail.fuelLogs.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-gray-400">No fuel logs for this vehicle.</p>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="border-b border-gray-200 dark:border-gray-800">
+                        <tr>
+                          <th className={thClass}>Liters</th>
+                          <th className={thClass}>Cost</th>
+                          <th className={thClass}>Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {detail.fuelLogs.map((f) => (
+                          <tr key={f.id}>
+                            <td className={`${tdClass} font-medium`}>{f.liters.toLocaleString()} L</td>
+                            <td className={tdClass}>₹{f.cost.toLocaleString()}</td>
+                            <td className={tdClass}>{format(new Date(f.date), 'dd MMM yyyy')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ))}
+              </div>
+            </div>
+          )}
         </Modal>
       )}
     </div>

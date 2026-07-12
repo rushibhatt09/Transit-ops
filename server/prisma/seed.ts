@@ -87,16 +87,16 @@ const VEHICLES: VehicleProfile[] = [
 ]
 
 const DRIVERS = [
+  { name: 'Arjun Mehta', licenseNumber: 'MH0220220045671', licenseCategory: 'LMV', expiryDays: 540, contactNumber: '9820011223', safetyScore: 94, status: 'AVAILABLE', isLoginDriver: true },
   { name: 'Alex Fernandes', licenseNumber: 'MH1420230012345', licenseCategory: 'LMV', expiryDays: 360, contactNumber: '9876543210', safetyScore: 92, status: 'AVAILABLE' },
   { name: 'Suresh Kumar', licenseNumber: 'DL0520190067890', licenseCategory: 'HMV', expiryDays: 20, contactNumber: '9876500000', safetyScore: 88, status: 'ON_TRIP' },
-  { name: 'Meena Iyer', licenseNumber: 'KA0320200098765', licenseCategory: 'HMV', expiryDays: -70, contactNumber: '9123456780', safetyScore: 75, status: 'AVAILABLE' },
+  { name: 'Mohan Iyer', licenseNumber: 'KA0320200098765', licenseCategory: 'HMV', expiryDays: -70, contactNumber: '9123456780', safetyScore: 75, status: 'AVAILABLE' },
   { name: 'Vikram Singh', licenseNumber: 'TN0920180011223', licenseCategory: 'LMV', expiryDays: 700, contactNumber: '9988776655', safetyScore: 95, status: 'OFF_DUTY' },
   { name: 'Ramesh Yadav', licenseNumber: 'GJ0120210033445', licenseCategory: 'HMV', expiryDays: -800, contactNumber: '9090909090', safetyScore: 60, status: 'SUSPENDED' },
-  { name: 'Priyanka Desai', licenseNumber: 'MH0920210077654', licenseCategory: 'LMV', expiryDays: 500, contactNumber: '9812345670', safetyScore: 90, status: 'AVAILABLE' },
+  { name: 'Sandeep Joshi', licenseNumber: 'MH0920210077654', licenseCategory: 'LMV', expiryDays: 500, contactNumber: '9812345670', safetyScore: 90, status: 'AVAILABLE' },
   { name: 'Manoj Tiwari', licenseNumber: 'UP3220190022110', licenseCategory: 'HMV', expiryDays: 300, contactNumber: '9765432180', safetyScore: 85, status: 'ON_TRIP' },
   { name: 'Farhan Sheikh', licenseNumber: 'RJ1420200055443', licenseCategory: 'HMV', expiryDays: 400, contactNumber: '9654321870', safetyScore: 82, status: 'AVAILABLE' },
   { name: 'Deepak Nair', licenseNumber: 'TS0720190066778', licenseCategory: 'HMV', expiryDays: 600, contactNumber: '9543218760', safetyScore: 96, status: 'AVAILABLE' },
-  { name: 'Anita Joshi', licenseNumber: 'KA0120220099887', licenseCategory: 'LMV', expiryDays: 450, contactNumber: '9432187650', safetyScore: 91, status: 'AVAILABLE' },
 ]
 
 async function main() {
@@ -119,6 +119,7 @@ async function main() {
       { name: 'Rohan Gupta', email: 'finance.analyst@transitops.com', passwordHash, role: 'FINANCIAL_ANALYST' },
     ],
   })
+  const driverUser = await prisma.user.findUniqueOrThrow({ where: { email: 'driver@transitops.com' } })
 
   console.log('Creating drivers...')
   const drivers = []
@@ -133,6 +134,7 @@ async function main() {
           contactNumber: d.contactNumber,
           safetyScore: d.safetyScore,
           status: d.status,
+          userId: (d as { isLoginDriver?: boolean }).isLoginDriver ? driverUser.id : null,
         },
       })
     )
@@ -252,7 +254,7 @@ async function main() {
       source: 'Ahmedabad',
       destination: 'Surat',
       vehicleId: van09.id,
-      driverId: driverByName['Priyanka Desai'].id,
+      driverId: driverByName['Sandeep Joshi'].id,
       cargoWeight: 1200,
       plannedDistance: 260,
       status: 'DRAFT',
@@ -267,7 +269,7 @@ async function main() {
       source: 'Mumbai',
       destination: 'Nashik',
       vehicleId: van12.id,
-      driverId: driverByName['Anita Joshi'].id,
+      driverId: driverByName['Deepak Nair'].id,
       cargoWeight: 350,
       plannedDistance: 180,
       status: 'CANCELLED',

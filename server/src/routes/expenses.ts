@@ -17,6 +17,7 @@ const schema = z.object({
 
 router.get(
   '/',
+  authorize('FLEET_MANAGER', 'FINANCIAL_ANALYST'),
   asyncHandler(async (req, res) => {
     const { vehicleId, type } = req.query as Record<string, string>
     const where: any = {}

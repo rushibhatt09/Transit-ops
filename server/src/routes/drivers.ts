@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../utils/prisma'
 import { authenticate, authorize } from '../middleware/auth'
 import { asyncHandler, ApiError } from '../middleware/errorHandler'
+import { requireOwnDriver } from '../utils/scope'
 
 const router = Router()
 router.use(authenticate)
@@ -29,6 +30,10 @@ router.get(
         { licenseNumber: { contains: search } },
       ]
     }
+    if (req.user!.role === 'DRIVER') {
+      const own = await requireOwnDriver(req.user!.id)
+      where.id = own.id
+    }
     const drivers = await prisma.driver.findMany({ where, orderBy: { createdAt: 'desc' } })
     res.json(drivers)
   })
@@ -37,9 +42,13 @@ router.get(
 router.get(
   '/:id',
   asyncHandler(async (req, res) => {
+    if (req.user!.role === 'DRIVER') {
+      const own = await requireOwnDriver(req.user!.id)
+      if (own.id !== req.params.id) throw new ApiError(403, 'You can only view your own profile')
+    }
     const driver = await prisma.driver.findUnique({
       where: { id: req.params.id },
-      include: { trips: { orderBy: { createdAt: 'desc' }, take: 10, include: { vehicle: true } } },
+      include: { trips: { orderBy: { createdAt: 'desc' }, take: 20, include: { vehicle: true } } },
     })
     if (!driver) throw new ApiError(404, 'Driver not found')
     res.json(driver)

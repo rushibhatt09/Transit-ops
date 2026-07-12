@@ -10,6 +10,7 @@ const WARNING_WINDOW_DAYS = 30
 
 router.get(
   '/license-expiry',
+  authorize('FLEET_MANAGER', 'SAFETY_OFFICER'),
   asyncHandler(async (_req, res) => {
     const now = Date.now()
     const windowEnd = now + WARNING_WINDOW_DAYS * 24 * 60 * 60 * 1000

@@ -16,6 +16,7 @@ const createSchema = z.object({
 
 router.get(
   '/',
+  authorize('FLEET_MANAGER', 'SAFETY_OFFICER', 'FINANCIAL_ANALYST'),
   asyncHandler(async (req, res) => {
     const { status, vehicleId } = req.query as Record<string, string>
     const where: any = {}

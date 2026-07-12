@@ -1,16 +1,174 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { Truck, CheckCircle2, Wrench, Route as RouteIcon, Clock, Users, Gauge } from 'lucide-react'
+import { Truck, CheckCircle2, Wrench, Route as RouteIcon, Clock, Users, Gauge, Fuel, ShieldCheck, AlertTriangle } from 'lucide-react'
+import { format } from 'date-fns'
 import { api } from '../lib/api'
-import { DashboardData, Vehicle } from '../types'
+import { DashboardData, DriverDashboardData, Vehicle } from '../types'
+import { useAuth } from '../context/AuthContext'
 import StatCard from '../components/StatCard'
+import StatusBadge from '../components/StatusBadge'
 import { SkeletonCards } from '../components/Skeleton'
-import { cardClass, inputClass, staggerContainer } from '../components/ui'
+import { cardClass, inputClass, staggerContainer, staggerItem } from '../components/ui'
 
 const PIE_COLORS = ['#10b981', '#4f6bff', '#f59e0b', '#9ca3af']
 
 export default function Dashboard() {
+  const { user } = useAuth()
+  if (user?.role === 'DRIVER') return <DriverDashboard />
+  return <FleetDashboard />
+}
+
+function DriverDashboard() {
+  const [data, setData] = useState<DriverDashboardData['driver'] | null>(null)
+
+  useEffect(() => {
+    api.get<DriverDashboardData>('/dashboard').then((res) => setData(res.data.driver))
+  }, [])
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">My Dashboard</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Your trips, performance, and license status</p>
+      </div>
+
+      {!data ? (
+        <SkeletonCards count={4} />
+      ) : (
+        <>
+          {data.profile.licenseDaysRemaining < 30 && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`flex items-start gap-3 rounded-xl border p-4 ${
+                data.profile.licenseDaysRemaining < 0
+                  ? 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300'
+                  : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300'
+              }`}
+            >
+              <AlertTriangle size={20} className="shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold">
+                  {data.profile.licenseDaysRemaining < 0
+                    ? 'Your driving license has expired'
+                    : `Your driving license expires in ${data.profile.licenseDaysRemaining} day${data.profile.licenseDaysRemaining === 1 ? '' : 's'}`}
+                </p>
+                <p className="text-sm">
+                  License {data.profile.licenseNumber} — expiry {format(new Date(data.profile.licenseExpiry), 'dd MMM yyyy')}. Please renew it to stay eligible for trips.
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          <motion.div
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+            className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4"
+          >
+            <StatCard label="Completed Trips" value={data.stats.completedTrips} icon={CheckCircle2} accent="emerald" />
+            <StatCard label="Total Distance (km)" value={data.stats.totalDistance} icon={RouteIcon} accent="brand" />
+            <StatCard label="Fuel Used (L)" value={data.stats.totalFuel} icon={Fuel} accent="amber" />
+            <StatCard label="Safety Score" value={data.profile.safetyScore} icon={ShieldCheck} accent="blue" />
+          </motion.div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+              className={`${cardClass} p-4`}
+            >
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Active Trip</p>
+              {data.activeTrip ? (
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-base font-semibold text-gray-900 dark:text-white">
+                      {data.activeTrip.source} → {data.activeTrip.destination}
+                    </p>
+                    <StatusBadge status={data.activeTrip.status} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Vehicle</p>
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                        {data.activeTrip.vehicle
+                          ? `${data.activeTrip.vehicle.registrationNumber} · ${data.activeTrip.vehicle.name}`
+                          : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Cargo Weight</p>
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                        {data.activeTrip.cargoWeight.toLocaleString()} kg
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Planned Distance</p>
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                        {data.activeTrip.plannedDistance.toLocaleString()} km
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Dispatched On</p>
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                        {data.activeTrip.dispatchedAt ? format(new Date(data.activeTrip.dispatchedAt), 'dd MMM yyyy') : '—'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <div className="h-11 w-11 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 mb-3">
+                    <Truck size={20} />
+                  </div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-300">No active trip right now</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">You'll see your assignment here once dispatched.</p>
+                </div>
+              )}
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.18 }}
+              className={`${cardClass} p-4`}
+            >
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-3">Recent Trips</p>
+              {data.recentTrips.length === 0 ? (
+                <p className="py-10 text-center text-sm text-gray-400">No trips yet.</p>
+              ) : (
+                <motion.div
+                  variants={staggerContainer}
+                  initial="initial"
+                  animate="animate"
+                  className="divide-y divide-gray-100 dark:divide-gray-800"
+                >
+                  {data.recentTrips.map((t) => (
+                    <motion.div key={t.id} variants={staggerItem} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                          {t.source} → {t.destination}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {t.vehicle?.registrationNumber || '—'} · {format(new Date(t.completedAt || t.dispatchedAt || t.createdAt), 'dd MMM yyyy')}
+                        </p>
+                      </div>
+                      <StatusBadge status={t.status} />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </motion.div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function FleetDashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [type, setType] = useState('')

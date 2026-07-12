@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../utils/prisma'
 import { authenticate, authorize } from '../middleware/auth'
 import { asyncHandler, ApiError } from '../middleware/errorHandler'
+import { requireOwnDriver } from '../utils/scope'
 
 const router = Router()
 router.use(authenticate)
@@ -45,6 +46,12 @@ async function assertAssignable(vehicleId: string, driverId: string, cargoWeight
   return { vehicle, driver }
 }
 
+async function assertTripAccess(req: { user?: { id: string; role: string } }, tripDriverId: string) {
+  if (req.user!.role !== 'DRIVER') return
+  const own = await requireOwnDriver(req.user!.id)
+  if (own.id !== tripDriverId) throw new ApiError(403, 'You can only manage your own trips')
+}
+
 router.get(
   '/',
   asyncHandler(async (req, res) => {
@@ -57,12 +64,48 @@ router.get(
         { destination: { contains: search } },
       ]
     }
+    if (req.user!.role === 'DRIVER') {
+      const own = await requireOwnDriver(req.user!.id)
+      where.driverId = own.id
+    }
     const trips = await prisma.trip.findMany({
       where,
       include: { vehicle: true, driver: true },
       orderBy: { createdAt: 'desc' },
     })
     res.json(trips)
+  })
+)
+
+router.get(
+  '/export',
+  authorize('FLEET_MANAGER', 'FINANCIAL_ANALYST'),
+  asyncHandler(async (_req, res) => {
+    const trips = await prisma.trip.findMany({
+      include: { vehicle: true, driver: true },
+      orderBy: { createdAt: 'desc' },
+    })
+    const headers = ['Source', 'Destination', 'Vehicle', 'Driver', 'Cargo (kg)', 'Planned Distance (km)', 'Actual Distance (km)', 'Fuel (L)', 'Revenue', 'Status', 'Created', 'Completed']
+    const rows = trips.map((t) => [
+      t.source,
+      t.destination,
+      t.vehicle.registrationNumber,
+      t.driver.name,
+      t.cargoWeight,
+      t.plannedDistance,
+      t.actualDistance ?? '',
+      t.fuelConsumed ?? '',
+      t.revenue,
+      t.status,
+      t.createdAt.toISOString().slice(0, 10),
+      t.completedAt ? t.completedAt.toISOString().slice(0, 10) : '',
+    ])
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    res.setHeader('Content-Type', 'text/csv')
+    res.setHeader('Content-Disposition', 'attachment; filename="transitops-trips.csv"')
+    res.send(csv)
   })
 )
 
@@ -74,6 +117,10 @@ router.get(
       include: { vehicle: true, driver: true, fuelLogs: true },
     })
     if (!trip) throw new ApiError(404, 'Trip not found')
+    if (req.user!.role === 'DRIVER') {
+      const own = await requireOwnDriver(req.user!.id)
+      if (own.id !== trip.driverId) throw new ApiError(403, 'You can only view your own trips')
+    }
     res.json(trip)
   })
 )
@@ -83,6 +130,10 @@ router.post(
   authorize('FLEET_MANAGER', 'DRIVER'),
   asyncHandler(async (req, res) => {
     const data = createTripSchema.parse(req.body)
+    if (req.user!.role === 'DRIVER') {
+      const own = await requireOwnDriver(req.user!.id)
+      data.driverId = own.id
+    }
     await assertAssignable(data.vehicleId, data.driverId, data.cargoWeight)
     const trip = await prisma.trip.create({ data: { ...data, status: 'DRAFT' } })
     res.status(201).json(trip)
@@ -95,6 +146,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const trip = await prisma.trip.findUnique({ where: { id: req.params.id } })
     if (!trip) throw new ApiError(404, 'Trip not found')
+    await assertTripAccess(req, trip.driverId)
     if (trip.status !== 'DRAFT') throw new ApiError(400, `Only draft trips can be dispatched (current status: ${trip.status})`)
 
     await assertAssignable(trip.vehicleId, trip.driverId, trip.cargoWeight)
@@ -114,6 +166,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const trip = await prisma.trip.findUnique({ where: { id: req.params.id }, include: { vehicle: true } })
     if (!trip) throw new ApiError(404, 'Trip not found')
+    await assertTripAccess(req, trip.driverId)
     if (trip.status !== 'DISPATCHED') throw new ApiError(400, `Only dispatched trips can be completed (current status: ${trip.status})`)
 
     const { finalOdometer, fuelConsumed, fuelCost, revenue } = completeTripSchema.parse(req.body)
@@ -144,6 +197,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const trip = await prisma.trip.findUnique({ where: { id: req.params.id } })
     if (!trip) throw new ApiError(404, 'Trip not found')
+    await assertTripAccess(req, trip.driverId)
     if (trip.status !== 'DRAFT' && trip.status !== 'DISPATCHED') {
       throw new ApiError(400, `Cannot cancel a trip with status ${trip.status}`)
     }

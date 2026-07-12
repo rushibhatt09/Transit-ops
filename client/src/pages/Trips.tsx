@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, Search, Rocket, CheckCircle2, XCircle } from 'lucide-react'
+import { Plus, Search, Rocket, CheckCircle2, XCircle, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import { api, getErrorMessage } from '../lib/api'
@@ -25,6 +25,8 @@ const emptyCompleteForm = { finalOdometer: '', fuelConsumed: '', fuelCost: '', r
 export default function Trips() {
   const { user } = useAuth()
   const canManage = user?.role === 'FLEET_MANAGER' || user?.role === 'DRIVER'
+  const isDriver = user?.role === 'DRIVER'
+  const canExport = user?.role === 'FLEET_MANAGER' || user?.role === 'FINANCIAL_ANALYST'
   const [trips, setTrips] = useState<Trip[]>([])
   const [tripsLoaded, setTripsLoaded] = useState(false)
   const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([])
@@ -47,7 +49,9 @@ export default function Trips() {
 
   function loadAvailability() {
     api.get<Vehicle[]>('/vehicles', { params: { status: 'AVAILABLE' } }).then((res) => setAvailableVehicles(res.data))
-    api.get<Driver[]>('/drivers', { params: { status: 'AVAILABLE' } }).then((res) => setAvailableDrivers(res.data))
+    if (!isDriver) {
+      api.get<Driver[]>('/drivers', { params: { status: 'AVAILABLE' } }).then((res) => setAvailableDrivers(res.data))
+    }
   }
 
   const filtered = useMemo(() => {
@@ -63,6 +67,7 @@ export default function Trips() {
   const selectedVehicle = availableVehicles.find((v) => v.id === form.vehicleId)
   const selectedDriverValid = availableDrivers.find((d) => d.id === form.driverId)
   const cargoExceeds = selectedVehicle && Number(form.cargoWeight) > selectedVehicle.maxLoadCapacity
+  const colCount = (isDriver ? 6 : 7) + (canManage ? 1 : 0)
 
   function openCreate() {
     setForm(emptyForm)
@@ -74,7 +79,12 @@ export default function Trips() {
     e.preventDefault()
     setSaving(true)
     try {
-      await api.post('/trips', { ...form, cargoWeight: Number(form.cargoWeight), plannedDistance: Number(form.plannedDistance) })
+      await api.post('/trips', {
+        ...form,
+        driverId: isDriver ? user?.driverId : form.driverId,
+        cargoWeight: Number(form.cargoWeight),
+        plannedDistance: Number(form.plannedDistance),
+      })
       toast.success('Trip created as draft')
       setCreateOpen(false)
       load()
@@ -121,6 +131,18 @@ export default function Trips() {
     }
   }
 
+  async function handleExportCsv() {
+    const token = localStorage.getItem('transitops_token')
+    const res = await fetch('/api/trips/export', { headers: { Authorization: `Bearer ${token}` } })
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'transitops-trips.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   async function handleCancel(trip: Trip) {
     if (!confirm('Cancel this trip?')) return
     try {
@@ -136,13 +158,24 @@ export default function Trips() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Trip Management</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Dispatch, monitor, and close out deliveries</p>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">{isDriver ? 'My Trips' : 'Trip Management'}</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {isDriver ? 'Your assigned deliveries, from draft to drop-off' : 'Dispatch, monitor, and close out deliveries'}
+          </p>
         </div>
-        {canManage && (
-          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={openCreate} className={primaryBtn}>
-            <Plus size={16} /> Create Trip
-          </motion.button>
+        {(canExport || canManage) && (
+          <div className="flex items-center gap-2">
+            {canExport && (
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleExportCsv} className={secondaryBtn}>
+                <Download size={16} /> Export CSV
+              </motion.button>
+            )}
+            {canManage && (
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={openCreate} className={primaryBtn}>
+                <Plus size={16} /> Create Trip
+              </motion.button>
+            )}
+          </div>
         )}
       </div>
 
@@ -167,14 +200,14 @@ export default function Trips() {
 
       <div className={`${cardClass} overflow-x-auto`}>
         {!tripsLoaded ? (
-          <SkeletonTable rows={5} cols={canManage ? 8 : 7} />
+          <SkeletonTable rows={5} cols={colCount} />
         ) : (
           <table className="w-full">
             <thead className="border-b border-gray-200 dark:border-gray-800">
               <tr>
                 <th className={thClass}>Route</th>
                 <th className={thClass}>Vehicle</th>
-                <th className={thClass}>Driver</th>
+                {!isDriver && <th className={thClass}>Driver</th>}
                 <th className={thClass}>Cargo (kg)</th>
                 <th className={thClass}>Distance</th>
                 <th className={thClass}>Status</th>
@@ -189,7 +222,7 @@ export default function Trips() {
                     {t.source} → {t.destination}
                   </td>
                   <td className={tdClass}>{t.vehicle?.registrationNumber}</td>
-                  <td className={tdClass}>{t.driver?.name}</td>
+                  {!isDriver && <td className={tdClass}>{t.driver?.name}</td>}
                   <td className={tdClass}>{t.cargoWeight}</td>
                   <td className={tdClass}>
                     {t.actualDistance ?? t.plannedDistance} {t.actualDistance ? '(actual)' : '(planned)'} km
@@ -223,7 +256,7 @@ export default function Trips() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">
+                  <td colSpan={colCount} className="px-4 py-8 text-center text-sm text-gray-400">
                     No trips found.
                   </td>
                 </tr>
@@ -256,18 +289,26 @@ export default function Trips() {
               </select>
               {availableVehicles.length === 0 && <p className="text-xs text-amber-500 mt-1">No available vehicles right now.</p>}
             </div>
-            <div>
-              <label className={labelClass}>Available Driver</label>
-              <select required className={inputClass} value={form.driverId} onChange={(e) => setForm({ ...form, driverId: e.target.value })}>
-                <option value="">Select driver...</option>
-                {availableDrivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name} ({d.licenseCategory})
-                  </option>
-                ))}
-              </select>
-              {availableDrivers.length === 0 && <p className="text-xs text-amber-500 mt-1">No available drivers right now.</p>}
-            </div>
+            {isDriver ? (
+              <div>
+                <label className={labelClass}>Driver</label>
+                <input readOnly className={`${inputClass} bg-gray-50 dark:bg-gray-800/60 cursor-default`} value={user?.name ?? 'You'} />
+                <p className="text-xs text-gray-400 mt-1">This trip will be assigned to you.</p>
+              </div>
+            ) : (
+              <div>
+                <label className={labelClass}>Available Driver</label>
+                <select required className={inputClass} value={form.driverId} onChange={(e) => setForm({ ...form, driverId: e.target.value })}>
+                  <option value="">Select driver...</option>
+                  {availableDrivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({d.licenseCategory})
+                    </option>
+                  ))}
+                </select>
+                {availableDrivers.length === 0 && <p className="text-xs text-amber-500 mt-1">No available drivers right now.</p>}
+              </div>
+            )}
             <div>
               <label className={labelClass}>Cargo Weight (kg)</label>
               <input required type="number" min="0" step="any" className={inputClass} value={form.cargoWeight} onChange={(e) => setForm({ ...form, cargoWeight: e.target.value })} />

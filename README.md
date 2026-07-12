@@ -2,7 +2,7 @@
 
 A fleet operations platform for logistics companies — vehicles, drivers, trip dispatching, maintenance, and fuel/expense tracking in one place, instead of spreadsheets and paper logbooks.
 
-Four people use it day to day: a **Fleet Manager** who owns the vehicles and maintenance schedule, a **Driver/dispatcher** who books and runs trips, a **Safety Officer** who watches license compliance and safety scores, and a **Financial Analyst** who cares about cost and ROI per vehicle.
+Four people use it day to day, and each gets their own slice of the system: the **Fleet Manager** sees and controls everything; a **Driver** logs in to a personal portal — their own trips, their own profile and license status, nothing else; the **Safety Officer** gets the compliance view (drivers, licenses, vehicles, maintenance) without the financials; and the **Financial Analyst** gets costs, fuel, expenses, and reports without driver-management controls. The scoping is enforced in the API, not just hidden in the menu — a driver's token literally can't fetch another driver's trips or the fleet reports.
 
 ## Stack
 
@@ -31,7 +31,7 @@ Log in with any of these (password `password123` for all of them) — the login 
 | Safety Officer | safety.officer@transitops.com |
 | Financial Analyst | finance.analyst@transitops.com |
 
-The seed data is a small but active fleet — 14 vehicles across four regions, 10 drivers (one suspended, one with an expired license, on purpose, to show the compliance checks working), and about 60 trips spread over the last couple of months so the dashboard and reports have something real to show rather than empty charts. Run `npm run seed` again any time to reset back to that state.
+The seed data is a small but active fleet — 14 vehicles across four regions, 10 drivers (one suspended, one with an expired license, on purpose, to show the compliance checks working), and about 60 trips spread over the last couple of months so the dashboard and reports have something real to show rather than empty charts. The driver login is linked to Arjun Mehta's driver record, so logging in as a driver drops you into his personal portal with his trip history. Run `npm run seed` again any time to reset back to that state.
 
 ## What it does
 
@@ -47,7 +47,7 @@ The business rules from the brief are enforced on the server, not just hinted at
 - Dispatch flips both vehicle and driver to "On Trip"; completing or cancelling flips them back
 - Opening a maintenance record locks the vehicle to "In Shop"; closing it (if nothing else is still open) releases it back to "Available", unless the vehicle's retired
 
-Beyond the core requirements: dark mode, a notification bell for licenses expiring within 30 days (with a "send reminder" action that logs what would go out by email), search/filter/sort on every table, a document-link field on vehicles for RC/insurance/permit references, and charts wired into both the dashboard and the reports page.
+Beyond the core requirements: role-scoped portals (personal driver dashboard with license countdown, a My Profile page, driver-only trip views), a vehicle detail view with full trip/maintenance/fuel history, trips CSV export, dark mode, a notification bell for licenses expiring within 30 days (with a "send reminder" action that logs what would go out by email), search/filter/sort on every table, a document-link field on vehicles for RC/insurance/permit references, and charts wired into both the dashboard and the reports page.
 
 Didn't get to: real outbound email (the reminder logic is there, it just logs instead of hitting an SMTP server) and PDF export, since CSV covers the actual requirement and PDF was marked optional.
 

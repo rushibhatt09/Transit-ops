@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { prisma } from '../utils/prisma'
 import { authenticate } from '../middleware/auth'
 import { asyncHandler } from '../middleware/errorHandler'
+import { requireOwnDriver } from '../utils/scope'
 
 const router = Router()
 router.use(authenticate)
@@ -9,6 +10,44 @@ router.use(authenticate)
 router.get(
   '/',
   asyncHandler(async (req, res) => {
+    if (req.user!.role === 'DRIVER') {
+      const own = await requireOwnDriver(req.user!.id)
+      const trips = await prisma.trip.findMany({
+        where: { driverId: own.id },
+        include: { vehicle: true },
+        orderBy: { createdAt: 'desc' },
+      })
+      const completed = trips.filter((t) => t.status === 'COMPLETED')
+      const activeTrip = trips.find((t) => t.status === 'DISPATCHED') ?? null
+      const draftTrips = trips.filter((t) => t.status === 'DRAFT').length
+      const totalDistance = completed.reduce((s, t) => s + (t.actualDistance ?? 0), 0)
+      const totalFuel = completed.reduce((s, t) => s + (t.fuelConsumed ?? 0), 0)
+      const licenseDaysRemaining = Math.ceil((new Date(own.licenseExpiry).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+
+      return res.json({
+        driver: {
+          profile: {
+            id: own.id,
+            name: own.name,
+            licenseNumber: own.licenseNumber,
+            licenseCategory: own.licenseCategory,
+            licenseExpiry: own.licenseExpiry,
+            licenseDaysRemaining,
+            safetyScore: own.safetyScore,
+            status: own.status,
+          },
+          activeTrip,
+          stats: {
+            completedTrips: completed.length,
+            draftTrips,
+            totalDistance: Math.round(totalDistance),
+            totalFuel: Math.round(totalFuel * 10) / 10,
+          },
+          recentTrips: trips.slice(0, 5),
+        },
+      })
+    }
+
     const { type, region } = req.query as Record<string, string>
     const vehicleWhere: any = {}
     if (type) vehicleWhere.type = type

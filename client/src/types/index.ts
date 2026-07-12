@@ -11,6 +11,30 @@ export interface User {
   name: string
   email: string
   role: Role
+  driverId?: string | null
+}
+
+export interface DriverDashboardData {
+  driver: {
+    profile: {
+      id: string
+      name: string
+      licenseNumber: string
+      licenseCategory: string
+      licenseExpiry: string
+      licenseDaysRemaining: number
+      safetyScore: number
+      status: DriverStatus
+    }
+    activeTrip: Trip | null
+    stats: {
+      completedTrips: number
+      draftTrips: number
+      totalDistance: number
+      totalFuel: number
+    }
+    recentTrips: Trip[]
+  }
 }
 
 export interface Vehicle {

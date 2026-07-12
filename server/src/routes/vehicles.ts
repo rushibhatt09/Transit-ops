@@ -33,6 +33,7 @@ router.get(
         { name: { contains: search } },
       ]
     }
+    if (req.user!.role === 'DRIVER') where.status = 'AVAILABLE'
     const vehicles = await prisma.vehicle.findMany({ where, orderBy: { createdAt: 'desc' } })
     res.json(vehicles)
   })

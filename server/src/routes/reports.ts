@@ -1,10 +1,11 @@
 import { Router } from 'express'
 import { prisma } from '../utils/prisma'
-import { authenticate } from '../middleware/auth'
+import { authenticate, authorize } from '../middleware/auth'
 import { asyncHandler } from '../middleware/errorHandler'
 
 const router = Router()
 router.use(authenticate)
+router.use(authorize('FLEET_MANAGER', 'FINANCIAL_ANALYST'))
 
 async function buildReport() {
   const vehicles = await prisma.vehicle.findMany({

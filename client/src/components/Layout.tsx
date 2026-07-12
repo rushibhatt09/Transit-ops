@@ -15,21 +15,52 @@ import {
   Bell,
   Menu,
   X,
+  UserCircle,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { api } from '../lib/api'
-import { LicenseAlert } from '../types'
+import { LicenseAlert, Role } from '../types'
 
-const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/vehicles', label: 'Vehicles', icon: Truck },
-  { to: '/drivers', label: 'Drivers', icon: Users },
-  { to: '/trips', label: 'Trips', icon: RouteIcon },
-  { to: '/maintenance', label: 'Maintenance', icon: Wrench },
-  { to: '/fuel-expenses', label: 'Fuel & Expenses', icon: Fuel },
-  { to: '/reports', label: 'Reports', icon: BarChart3 },
-]
+interface NavItem {
+  to: string
+  label: string
+  icon: typeof LayoutDashboard
+}
+
+const ROLE_NAV: Record<Role, NavItem[]> = {
+  FLEET_MANAGER: [
+    { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/vehicles', label: 'Vehicles', icon: Truck },
+    { to: '/drivers', label: 'Drivers', icon: Users },
+    { to: '/trips', label: 'Trips', icon: RouteIcon },
+    { to: '/maintenance', label: 'Maintenance', icon: Wrench },
+    { to: '/fuel-expenses', label: 'Fuel & Expenses', icon: Fuel },
+    { to: '/reports', label: 'Reports', icon: BarChart3 },
+  ],
+  DRIVER: [
+    { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/trips', label: 'My Trips', icon: RouteIcon },
+    { to: '/profile', label: 'My Profile', icon: UserCircle },
+  ],
+  SAFETY_OFFICER: [
+    { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/drivers', label: 'Drivers', icon: Users },
+    { to: '/vehicles', label: 'Vehicles', icon: Truck },
+    { to: '/trips', label: 'Trips', icon: RouteIcon },
+    { to: '/maintenance', label: 'Maintenance', icon: Wrench },
+  ],
+  FINANCIAL_ANALYST: [
+    { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/vehicles', label: 'Vehicles', icon: Truck },
+    { to: '/trips', label: 'Trips', icon: RouteIcon },
+    { to: '/maintenance', label: 'Maintenance', icon: Wrench },
+    { to: '/fuel-expenses', label: 'Fuel & Expenses', icon: Fuel },
+    { to: '/reports', label: 'Reports', icon: BarChart3 },
+  ],
+}
+
+const ALERT_ROLES: Role[] = ['FLEET_MANAGER', 'SAFETY_OFFICER']
 
 const ROLE_LABELS: Record<string, string> = {
   FLEET_MANAGER: 'Fleet Manager',
@@ -47,19 +78,23 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [showAlerts, setShowAlerts] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  const navItems = user ? ROLE_NAV[user.role] : []
+  const canSeeAlerts = user ? ALERT_ROLES.includes(user.role) : false
+
   useEffect(() => {
+    if (!canSeeAlerts) return
     api
       .get<LicenseAlert[]>('/notifications/license-expiry')
       .then((res) => setAlerts(res.data))
       .catch(() => {})
-  }, [])
+  }, [canSeeAlerts])
 
   function handleLogout() {
     logout()
     navigate('/login')
   }
 
-  const activeItem = NAV_ITEMS.find((item) => (item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to)))
+  const activeItem = navItems.find((item) => (item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to)))
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 bg-grid-light dark:bg-grid-dark bg-grid">
@@ -101,7 +136,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const isActive = activeItem?.to === item.to
             return (
               <NavLink
@@ -143,6 +178,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       <div className="lg:pl-64 pt-14 lg:pt-0">
         <header className="hidden lg:flex items-center justify-end gap-3 px-6 py-4 border-b border-gray-200/70 dark:border-gray-800/70 glass sticky top-0 z-20">
+          {canSeeAlerts && (
           <div className="relative">
             <button
               onClick={() => setShowAlerts((s) => !s)}
@@ -182,6 +218,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               )}
             </AnimatePresence>
           </div>
+          )}
           <button
             onClick={toggle}
             className="relative p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors overflow-hidden"

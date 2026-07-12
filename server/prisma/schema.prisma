@@ -41,6 +41,7 @@ model Vehicle {
 
 model Driver {
   id              String   @id @default(cuid())
+  userId          String?  @unique
   name            String
   licenseNumber   String   @unique
   licenseCategory String
