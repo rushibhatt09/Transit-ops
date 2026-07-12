@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Plus, Search, Rocket, CheckCircle2, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
@@ -7,7 +8,8 @@ import { Trip, Vehicle, Driver } from '../types'
 import { useAuth } from '../context/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import Modal from '../components/Modal'
-import { primaryBtn, secondaryBtn, inputClass, labelClass, cardClass, thClass, tdClass } from '../components/ui'
+import { SkeletonTable } from '../components/Skeleton'
+import { primaryBtn, secondaryBtn, inputClass, labelClass, cardClass, thClass, tdClass, staggerContainer, staggerItem } from '../components/ui'
 
 const TABS: { key: string; label: string }[] = [
   { key: '', label: 'All' },
@@ -24,6 +26,7 @@ export default function Trips() {
   const { user } = useAuth()
   const canManage = user?.role === 'FLEET_MANAGER' || user?.role === 'DRIVER'
   const [trips, setTrips] = useState<Trip[]>([])
+  const [tripsLoaded, setTripsLoaded] = useState(false)
   const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([])
   const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([])
   const [tab, setTab] = useState('')
@@ -35,7 +38,10 @@ export default function Trips() {
   const [completeForm, setCompleteForm] = useState(emptyCompleteForm)
 
   function load() {
-    api.get<Trip[]>('/trips').then((res) => setTrips(res.data))
+    api.get<Trip[]>('/trips').then((res) => {
+      setTrips(res.data)
+      setTripsLoaded(true)
+    })
   }
   useEffect(load, [])
 
@@ -134,9 +140,9 @@ export default function Trips() {
           <p className="text-sm text-gray-500 dark:text-gray-400">Dispatch, monitor, and close out deliveries</p>
         </div>
         {canManage && (
-          <button onClick={openCreate} className={primaryBtn}>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={openCreate} className={primaryBtn}>
             <Plus size={16} /> Create Trip
-          </button>
+          </motion.button>
         )}
       </div>
 
@@ -145,7 +151,7 @@ export default function Trips() {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
               tab === t.key ? 'bg-brand-600 text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300'
             }`}
           >
@@ -160,67 +166,71 @@ export default function Trips() {
       </div>
 
       <div className={`${cardClass} overflow-x-auto`}>
-        <table className="w-full">
-          <thead className="border-b border-gray-200 dark:border-gray-800">
-            <tr>
-              <th className={thClass}>Route</th>
-              <th className={thClass}>Vehicle</th>
-              <th className={thClass}>Driver</th>
-              <th className={thClass}>Cargo (kg)</th>
-              <th className={thClass}>Distance</th>
-              <th className={thClass}>Status</th>
-              <th className={thClass}>Created</th>
-              {canManage && <th className={thClass}>Actions</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {filtered.map((t) => (
-              <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                <td className={`${tdClass} font-medium`}>
-                  {t.source} → {t.destination}
-                </td>
-                <td className={tdClass}>{t.vehicle?.registrationNumber}</td>
-                <td className={tdClass}>{t.driver?.name}</td>
-                <td className={tdClass}>{t.cargoWeight}</td>
-                <td className={tdClass}>
-                  {t.actualDistance ?? t.plannedDistance} {t.actualDistance ? '(actual)' : '(planned)'} km
-                </td>
-                <td className={tdClass}>
-                  <StatusBadge status={t.status} />
-                </td>
-                <td className={tdClass}>{format(new Date(t.createdAt), 'dd MMM yyyy')}</td>
-                {canManage && (
-                  <td className={tdClass}>
-                    <div className="flex gap-2">
-                      {t.status === 'DRAFT' && (
-                        <button title="Dispatch" onClick={() => handleDispatch(t)} className="text-gray-500 hover:text-blue-600">
-                          <Rocket size={16} />
-                        </button>
-                      )}
-                      {t.status === 'DISPATCHED' && (
-                        <button title="Complete" onClick={() => openComplete(t)} className="text-gray-500 hover:text-emerald-600">
-                          <CheckCircle2 size={16} />
-                        </button>
-                      )}
-                      {(t.status === 'DRAFT' || t.status === 'DISPATCHED') && (
-                        <button title="Cancel" onClick={() => handleCancel(t)} className="text-gray-500 hover:text-red-600">
-                          <XCircle size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {filtered.length === 0 && (
+        {!tripsLoaded ? (
+          <SkeletonTable rows={5} cols={canManage ? 8 : 7} />
+        ) : (
+          <table className="w-full">
+            <thead className="border-b border-gray-200 dark:border-gray-800">
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">
-                  No trips found.
-                </td>
+                <th className={thClass}>Route</th>
+                <th className={thClass}>Vehicle</th>
+                <th className={thClass}>Driver</th>
+                <th className={thClass}>Cargo (kg)</th>
+                <th className={thClass}>Distance</th>
+                <th className={thClass}>Status</th>
+                <th className={thClass}>Created</th>
+                {canManage && <th className={thClass}>Actions</th>}
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <motion.tbody variants={staggerContainer} initial="initial" animate="animate" className="divide-y divide-gray-100 dark:divide-gray-800">
+              {filtered.map((t) => (
+                <motion.tr key={t.id} variants={staggerItem} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <td className={`${tdClass} font-medium`}>
+                    {t.source} → {t.destination}
+                  </td>
+                  <td className={tdClass}>{t.vehicle?.registrationNumber}</td>
+                  <td className={tdClass}>{t.driver?.name}</td>
+                  <td className={tdClass}>{t.cargoWeight}</td>
+                  <td className={tdClass}>
+                    {t.actualDistance ?? t.plannedDistance} {t.actualDistance ? '(actual)' : '(planned)'} km
+                  </td>
+                  <td className={tdClass}>
+                    <StatusBadge status={t.status} />
+                  </td>
+                  <td className={tdClass}>{format(new Date(t.createdAt), 'dd MMM yyyy')}</td>
+                  {canManage && (
+                    <td className={tdClass}>
+                      <div className="flex gap-2">
+                        {t.status === 'DRAFT' && (
+                          <button title="Dispatch" onClick={() => handleDispatch(t)} className="text-gray-500 hover:text-blue-600">
+                            <Rocket size={16} />
+                          </button>
+                        )}
+                        {t.status === 'DISPATCHED' && (
+                          <button title="Complete" onClick={() => openComplete(t)} className="text-gray-500 hover:text-emerald-600">
+                            <CheckCircle2 size={16} />
+                          </button>
+                        )}
+                        {(t.status === 'DRAFT' || t.status === 'DISPATCHED') && (
+                          <button title="Cancel" onClick={() => handleCancel(t)} className="text-gray-500 hover:text-red-600">
+                            <XCircle size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </motion.tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">
+                    No trips found.
+                  </td>
+                </tr>
+              )}
+            </motion.tbody>
+          </table>
+        )}
       </div>
 
       {createOpen && (

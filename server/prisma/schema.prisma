@@ -7,13 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// SQLite has no native enum support in Prisma, so Role/status fields are
-// plain strings constrained by Zod schemas at the API layer. Allowed values:
-// Role: FLEET_MANAGER | DRIVER | SAFETY_OFFICER | FINANCIAL_ANALYST
-// Vehicle.status: AVAILABLE | ON_TRIP | IN_SHOP | RETIRED
-// Driver.status: AVAILABLE | ON_TRIP | OFF_DUTY | SUSPENDED
-// Trip.status: DRAFT | DISPATCHED | COMPLETED | CANCELLED
-// MaintenanceLog.status: OPEN | CLOSED
+// no native enums on sqlite - role/status fields are strings, validated in the zod schemas
 // Expense.type: TOLL | MAINTENANCE | OTHER
 
 model User {

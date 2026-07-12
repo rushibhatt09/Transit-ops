@@ -12,5 +12,4 @@ server/prisma/*.db-journal
 .vscode/
 .idea/
 coverage/
-.claude/
 *.tsbuildinfo

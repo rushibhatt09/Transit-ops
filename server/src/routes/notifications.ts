@@ -44,8 +44,7 @@ router.post(
       where: { licenseExpiry: { lte: new Date(windowEnd) } },
     })
 
-    // Email dispatch is simulated for this demo environment: reminders are logged
-    // server-side rather than sent through a live SMTP relay.
+    // TODO: hook up a real SMTP relay - for now this just logs what would go out
     drivers.forEach((d) => {
       console.log(
         `[EMAIL REMINDER] To: safety-officer@transitops.local | Subject: License expiring for ${d.name} | ` +

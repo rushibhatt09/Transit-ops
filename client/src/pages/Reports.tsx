@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Download } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { api } from '../lib/api'
 import { VehicleReport } from '../types'
-import { primaryBtn, cardClass, thClass, tdClass } from '../components/ui'
+import { primaryBtn, cardClass, thClass, tdClass, staggerContainer, staggerItem } from '../components/ui'
+import { SkeletonTable } from '../components/Skeleton'
 
 export default function Reports() {
   const [report, setReport] = useState<VehicleReport[]>([])
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    api.get<VehicleReport[]>('/reports').then((res) => setReport(res.data))
+    api.get<VehicleReport[]>('/reports').then((res) => {
+      setReport(res.data)
+      setLoaded(true)
+    })
   }, [])
 
   async function handleExportCsv() {
@@ -42,13 +48,23 @@ export default function Reports() {
             Fleet-wide operational cost ₹{totals.operationalCost.toLocaleString()} · Revenue ₹{totals.totalRevenue.toLocaleString()} · Distance {totals.totalDistance.toLocaleString()} km
           </p>
         </div>
-        <button onClick={handleExportCsv} className={primaryBtn}>
+        <motion.button
+          onClick={handleExportCsv}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={primaryBtn}
+        >
           <Download size={16} /> Export CSV
-        </button>
+        </motion.button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className={`${cardClass} p-4`}>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className={`${cardClass} p-4`}
+        >
           <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">Fuel Efficiency (km/L)</p>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={report}>
@@ -59,8 +75,13 @@ export default function Reports() {
               <Bar dataKey="fuelEfficiency" fill="#10b981" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-        <div className={`${cardClass} p-4`}>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.18 }}
+          className={`${cardClass} p-4`}
+        >
           <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">Operational Cost vs Revenue</p>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={report}>
@@ -73,49 +94,58 @@ export default function Reports() {
               <Bar dataKey="totalRevenue" name="Revenue" fill="#2563eb" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </motion.div>
       </div>
 
       <div className={`${cardClass} overflow-x-auto`}>
-        <table className="w-full">
-          <thead className="border-b border-gray-200 dark:border-gray-800">
-            <tr>
-              <th className={thClass}>Vehicle</th>
-              <th className={thClass}>Trips</th>
-              <th className={thClass}>Distance (km)</th>
-              <th className={thClass}>Fuel (L)</th>
-              <th className={thClass}>Fuel Efficiency</th>
-              <th className={thClass}>Fuel Cost</th>
-              <th className={thClass}>Maintenance Cost</th>
-              <th className={thClass}>Operational Cost</th>
-              <th className={thClass}>Revenue</th>
-              <th className={thClass}>ROI %</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {report.map((r) => (
-              <tr key={r.vehicleId} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                <td className={`${tdClass} font-medium`}>{r.registrationNumber}</td>
-                <td className={tdClass}>{r.completedTrips}</td>
-                <td className={tdClass}>{r.totalDistance}</td>
-                <td className={tdClass}>{r.totalFuelLiters}</td>
-                <td className={tdClass}>{r.fuelEfficiency.toFixed(2)} km/L</td>
-                <td className={tdClass}>₹{r.totalFuelCost.toLocaleString()}</td>
-                <td className={tdClass}>₹{r.totalMaintenanceCost.toLocaleString()}</td>
-                <td className={tdClass}>₹{r.operationalCost.toLocaleString()}</td>
-                <td className={tdClass}>₹{r.totalRevenue.toLocaleString()}</td>
-                <td className={`${tdClass} font-semibold ${r.roi >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{r.roi.toFixed(1)}%</td>
-              </tr>
-            ))}
-            {report.length === 0 && (
+        {!loaded ? (
+          <SkeletonTable rows={5} cols={10} />
+        ) : (
+          <table className="w-full">
+            <thead className="border-b border-gray-200 dark:border-gray-800">
               <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-sm text-gray-400">
-                  No report data yet.
-                </td>
+                <th className={thClass}>Vehicle</th>
+                <th className={thClass}>Trips</th>
+                <th className={thClass}>Distance (km)</th>
+                <th className={thClass}>Fuel (L)</th>
+                <th className={thClass}>Fuel Efficiency</th>
+                <th className={thClass}>Fuel Cost</th>
+                <th className={thClass}>Maintenance Cost</th>
+                <th className={thClass}>Operational Cost</th>
+                <th className={thClass}>Revenue</th>
+                <th className={thClass}>ROI %</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <motion.tbody
+              variants={staggerContainer}
+              initial="initial"
+              animate="animate"
+              className="divide-y divide-gray-100 dark:divide-gray-800"
+            >
+              {report.map((r) => (
+                <motion.tr key={r.vehicleId} variants={staggerItem} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <td className={`${tdClass} font-medium`}>{r.registrationNumber}</td>
+                  <td className={tdClass}>{r.completedTrips}</td>
+                  <td className={tdClass}>{r.totalDistance}</td>
+                  <td className={tdClass}>{r.totalFuelLiters}</td>
+                  <td className={tdClass}>{r.fuelEfficiency.toFixed(2)} km/L</td>
+                  <td className={tdClass}>₹{r.totalFuelCost.toLocaleString()}</td>
+                  <td className={tdClass}>₹{r.totalMaintenanceCost.toLocaleString()}</td>
+                  <td className={tdClass}>₹{r.operationalCost.toLocaleString()}</td>
+                  <td className={tdClass}>₹{r.totalRevenue.toLocaleString()}</td>
+                  <td className={`${tdClass} font-semibold ${r.roi >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{r.roi.toFixed(1)}%</td>
+                </motion.tr>
+              ))}
+              {report.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-gray-400">
+                    No report data yet.
+                  </td>
+                </tr>
+              )}
+            </motion.tbody>
+          </table>
+        )}
       </div>
     </div>
   )

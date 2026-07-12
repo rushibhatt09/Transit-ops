@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Plus, CheckCircle2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
@@ -7,7 +8,8 @@ import { MaintenanceLog, Vehicle } from '../types'
 import { useAuth } from '../context/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import Modal from '../components/Modal'
-import { primaryBtn, secondaryBtn, inputClass, labelClass, cardClass, thClass, tdClass } from '../components/ui'
+import { SkeletonTable } from '../components/Skeleton'
+import { primaryBtn, secondaryBtn, inputClass, labelClass, cardClass, thClass, tdClass, staggerContainer, staggerItem } from '../components/ui'
 
 const emptyForm = { vehicleId: '', description: '', cost: '', date: new Date().toISOString().slice(0, 10) }
 
@@ -20,9 +22,13 @@ export default function Maintenance() {
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   function load() {
-    api.get<MaintenanceLog[]>('/maintenance', { params: statusFilter ? { status: statusFilter } : {} }).then((res) => setLogs(res.data))
+    api.get<MaintenanceLog[]>('/maintenance', { params: statusFilter ? { status: statusFilter } : {} }).then((res) => {
+      setLogs(res.data)
+      setLoading(false)
+    })
   }
   useEffect(load, [statusFilter])
 
@@ -65,9 +71,9 @@ export default function Maintenance() {
           <p className="text-sm text-gray-500 dark:text-gray-400">Track service records and vehicle downtime</p>
         </div>
         {canWrite && (
-          <button onClick={openCreate} className={primaryBtn}>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={openCreate} className={primaryBtn}>
             <Plus size={16} /> New Maintenance Record
-          </button>
+          </motion.button>
         )}
       </div>
 
@@ -76,7 +82,7 @@ export default function Maintenance() {
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
               statusFilter === s ? 'bg-brand-600 text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300'
             }`}
           >
@@ -86,47 +92,51 @@ export default function Maintenance() {
       </div>
 
       <div className={`${cardClass} overflow-x-auto`}>
-        <table className="w-full">
-          <thead className="border-b border-gray-200 dark:border-gray-800">
-            <tr>
-              <th className={thClass}>Vehicle</th>
-              <th className={thClass}>Description</th>
-              <th className={thClass}>Cost</th>
-              <th className={thClass}>Date</th>
-              <th className={thClass}>Status</th>
-              {canWrite && <th className={thClass}>Actions</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {logs.map((log) => (
-              <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                <td className={`${tdClass} font-medium`}>{log.vehicle?.registrationNumber}</td>
-                <td className={tdClass}>{log.description}</td>
-                <td className={tdClass}>₹{log.cost.toLocaleString()}</td>
-                <td className={tdClass}>{format(new Date(log.date), 'dd MMM yyyy')}</td>
-                <td className={tdClass}>
-                  <StatusBadge status={log.status} />
-                </td>
-                {canWrite && (
-                  <td className={tdClass}>
-                    {log.status === 'OPEN' && (
-                      <button title="Close" onClick={() => handleClose(log)} className="text-gray-500 hover:text-emerald-600">
-                        <CheckCircle2 size={16} />
-                      </button>
-                    )}
-                  </td>
-                )}
-              </tr>
-            ))}
-            {logs.length === 0 && (
+        {loading ? (
+          <SkeletonTable rows={5} cols={canWrite ? 6 : 5} />
+        ) : (
+          <table className="w-full">
+            <thead className="border-b border-gray-200 dark:border-gray-800">
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
-                  No maintenance records found.
-                </td>
+                <th className={thClass}>Vehicle</th>
+                <th className={thClass}>Description</th>
+                <th className={thClass}>Cost</th>
+                <th className={thClass}>Date</th>
+                <th className={thClass}>Status</th>
+                {canWrite && <th className={thClass}>Actions</th>}
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <motion.tbody variants={staggerContainer} initial="initial" animate="animate" className="divide-y divide-gray-100 dark:divide-gray-800">
+              {logs.map((log) => (
+                <motion.tr key={log.id} variants={staggerItem} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <td className={`${tdClass} font-medium`}>{log.vehicle?.registrationNumber}</td>
+                  <td className={tdClass}>{log.description}</td>
+                  <td className={tdClass}>₹{log.cost.toLocaleString()}</td>
+                  <td className={tdClass}>{format(new Date(log.date), 'dd MMM yyyy')}</td>
+                  <td className={tdClass}>
+                    <StatusBadge status={log.status} />
+                  </td>
+                  {canWrite && (
+                    <td className={tdClass}>
+                      {log.status === 'OPEN' && (
+                        <button title="Close" onClick={() => handleClose(log)} className="text-gray-500 hover:text-emerald-600">
+                          <CheckCircle2 size={16} />
+                        </button>
+                      )}
+                    </td>
+                  )}
+                </motion.tr>
+              ))}
+              {logs.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
+                    No maintenance records found.
+                  </td>
+                </tr>
+              )}
+            </motion.tbody>
+          </table>
+        )}
       </div>
 
       {modalOpen && (

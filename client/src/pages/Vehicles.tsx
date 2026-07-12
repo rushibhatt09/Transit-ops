@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Plus, Search, Pencil, Trash2, ArrowUpDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api, getErrorMessage } from '../lib/api'
@@ -6,7 +7,8 @@ import { Vehicle } from '../types'
 import { useAuth } from '../context/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import Modal from '../components/Modal'
-import { primaryBtn, secondaryBtn, dangerBtn, inputClass, labelClass, cardClass, thClass, tdClass } from '../components/ui'
+import { SkeletonTable } from '../components/Skeleton'
+import { primaryBtn, secondaryBtn, dangerBtn, inputClass, labelClass, cardClass, thClass, tdClass, staggerContainer, staggerItem } from '../components/ui'
 
 const STATUS_OPTIONS = ['AVAILABLE', 'ON_TRIP', 'IN_SHOP', 'RETIRED']
 
@@ -26,6 +28,7 @@ export default function Vehicles() {
   const { user } = useAuth()
   const canWrite = user?.role === 'FLEET_MANAGER'
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [loaded, setLoaded] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sortKey, setSortKey] = useState<keyof Vehicle>('createdAt')
@@ -36,7 +39,10 @@ export default function Vehicles() {
   const [saving, setSaving] = useState(false)
 
   function load() {
-    api.get<Vehicle[]>('/vehicles').then((res) => setVehicles(res.data))
+    api.get<Vehicle[]>('/vehicles').then((res) => {
+      setVehicles(res.data)
+      setLoaded(true)
+    })
   }
 
   useEffect(load, [])
@@ -143,9 +149,14 @@ export default function Vehicles() {
           <p className="text-sm text-gray-500 dark:text-gray-400">Master list of fleet vehicles</p>
         </div>
         {canWrite && (
-          <button onClick={openCreate} className={primaryBtn}>
+          <motion.button
+            onClick={openCreate}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className={primaryBtn}
+          >
             <Plus size={16} /> Register Vehicle
-          </button>
+          </motion.button>
         )}
       </div>
 
@@ -170,55 +181,64 @@ export default function Vehicles() {
       </div>
 
       <div className={`${cardClass} overflow-x-auto`}>
-        <table className="w-full">
-          <thead className="border-b border-gray-200 dark:border-gray-800">
-            <tr>
-              {columns.map((c) => (
-                <th key={c.key} className={thClass}>
-                  <button onClick={() => toggleSort(c.key)} className="flex items-center gap-1 hover:text-gray-800 dark:hover:text-gray-200">
-                    {c.label} <ArrowUpDown size={12} />
-                  </button>
-                </th>
-              ))}
-              {canWrite && <th className={thClass}>Actions</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {filtered.map((v) => (
-              <tr key={v.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                <td className={`${tdClass} font-medium`}>{v.registrationNumber}</td>
-                <td className={tdClass}>{v.name}</td>
-                <td className={tdClass}>{v.type}</td>
-                <td className={tdClass}>{v.maxLoadCapacity}</td>
-                <td className={tdClass}>{v.odometer}</td>
-                <td className={tdClass}>₹{v.acquisitionCost.toLocaleString()}</td>
-                <td className={tdClass}>{v.region}</td>
-                <td className={tdClass}>
-                  <StatusBadge status={v.status} />
-                </td>
-                {canWrite && (
-                  <td className={tdClass}>
-                    <div className="flex gap-2">
-                      <button onClick={() => openEdit(v)} className="text-gray-500 hover:text-brand-600">
-                        <Pencil size={16} />
-                      </button>
-                      <button onClick={() => handleDelete(v)} className="text-gray-500 hover:text-red-600">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {filtered.length === 0 && (
+        {!loaded ? (
+          <SkeletonTable rows={5} cols={9} />
+        ) : (
+          <table className="w-full">
+            <thead className="border-b border-gray-200 dark:border-gray-800">
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-400">
-                  No vehicles found.
-                </td>
+                {columns.map((c) => (
+                  <th key={c.key} className={thClass}>
+                    <button onClick={() => toggleSort(c.key)} className="flex items-center gap-1 hover:text-gray-800 dark:hover:text-gray-200">
+                      {c.label} <ArrowUpDown size={12} />
+                    </button>
+                  </th>
+                ))}
+                {canWrite && <th className={thClass}>Actions</th>}
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <motion.tbody
+              variants={staggerContainer}
+              initial="initial"
+              animate="animate"
+              className="divide-y divide-gray-100 dark:divide-gray-800"
+            >
+              {filtered.map((v) => (
+                <motion.tr key={v.id} variants={staggerItem} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <td className={`${tdClass} font-medium`}>{v.registrationNumber}</td>
+                  <td className={tdClass}>{v.name}</td>
+                  <td className={tdClass}>{v.type}</td>
+                  <td className={tdClass}>{v.maxLoadCapacity}</td>
+                  <td className={tdClass}>{v.odometer}</td>
+                  <td className={tdClass}>₹{v.acquisitionCost.toLocaleString()}</td>
+                  <td className={tdClass}>{v.region}</td>
+                  <td className={tdClass}>
+                    <StatusBadge status={v.status} />
+                  </td>
+                  {canWrite && (
+                    <td className={tdClass}>
+                      <div className="flex gap-2">
+                        <button onClick={() => openEdit(v)} className="text-gray-500 hover:text-brand-600">
+                          <Pencil size={16} />
+                        </button>
+                        <button onClick={() => handleDelete(v)} className="text-gray-500 hover:text-red-600">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  )}
+                </motion.tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-400">
+                    No vehicles found.
+                  </td>
+                </tr>
+              )}
+            </motion.tbody>
+          </table>
+        )}
       </div>
 
       {modalOpen && (

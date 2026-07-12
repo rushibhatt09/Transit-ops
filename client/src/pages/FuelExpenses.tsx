@@ -2,11 +2,13 @@ import { FormEvent, useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
+import { motion } from 'framer-motion'
 import { api, getErrorMessage } from '../lib/api'
 import { FuelLog, Expense, Vehicle, ExpenseType } from '../types'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/Modal'
-import { primaryBtn, secondaryBtn, inputClass, labelClass, cardClass, thClass, tdClass } from '../components/ui'
+import { SkeletonTable } from '../components/Skeleton'
+import { primaryBtn, secondaryBtn, inputClass, labelClass, cardClass, thClass, tdClass, staggerContainer, staggerItem } from '../components/ui'
 
 const EXPENSE_TYPES: ExpenseType[] = ['TOLL', 'MAINTENANCE', 'OTHER']
 
@@ -28,11 +30,15 @@ export default function FuelExpenses() {
   const [expenseModalOpen, setExpenseModalOpen] = useState(false)
   const [expenseForm, setExpenseForm] = useState(emptyExpenseForm)
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   function load() {
-    api.get<FuelLog[]>('/fuel-logs').then((res) => setFuelLogs(res.data))
-    api.get<Expense[]>('/expenses').then((res) => setExpenses(res.data))
-    api.get<Vehicle[]>('/vehicles').then((res) => setVehicles(res.data))
+    setLoading(true)
+    Promise.all([
+      api.get<FuelLog[]>('/fuel-logs').then((res) => setFuelLogs(res.data)),
+      api.get<Expense[]>('/expenses').then((res) => setExpenses(res.data)),
+      api.get<Vehicle[]>('/vehicles').then((res) => setVehicles(res.data)),
+    ]).finally(() => setLoading(false))
   }
   useEffect(load, [])
 
@@ -79,7 +85,9 @@ export default function FuelExpenses() {
           </p>
         </div>
         {tab === 'fuel' && canLogFuel && (
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => {
               setFuelForm(emptyFuelForm)
               setFuelModalOpen(true)
@@ -87,10 +95,12 @@ export default function FuelExpenses() {
             className={primaryBtn}
           >
             <Plus size={16} /> Log Fuel
-          </button>
+          </motion.button>
         )}
         {tab === 'expenses' && canLogExpense && (
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => {
               setExpenseForm(emptyExpenseForm)
               setExpenseModalOpen(true)
@@ -98,80 +108,118 @@ export default function FuelExpenses() {
             className={primaryBtn}
           >
             <Plus size={16} /> Log Expense
-          </button>
+          </motion.button>
         )}
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => setTab('fuel')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${tab === 'fuel' ? 'bg-brand-600 text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300'}`}>
-          Fuel Logs
+        <button
+          onClick={() => setTab('fuel')}
+          className={`relative overflow-hidden px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'fuel' ? 'text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300'}`}
+        >
+          {tab === 'fuel' && (
+            <motion.span
+              layoutId="fuelExpenseTabPill"
+              className="absolute inset-0 rounded-lg bg-brand-600"
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            />
+          )}
+          <span className="relative">Fuel Logs</span>
         </button>
-        <button onClick={() => setTab('expenses')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${tab === 'expenses' ? 'bg-brand-600 text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300'}`}>
-          Expenses
+        <button
+          onClick={() => setTab('expenses')}
+          className={`relative overflow-hidden px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'expenses' ? 'text-white' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300'}`}
+        >
+          {tab === 'expenses' && (
+            <motion.span
+              layoutId="fuelExpenseTabPill"
+              className="absolute inset-0 rounded-lg bg-brand-600"
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            />
+          )}
+          <span className="relative">Expenses</span>
         </button>
       </div>
 
       {tab === 'fuel' ? (
         <div className={`${cardClass} overflow-x-auto`}>
-          <table className="w-full">
-            <thead className="border-b border-gray-200 dark:border-gray-800">
-              <tr>
-                <th className={thClass}>Vehicle</th>
-                <th className={thClass}>Liters</th>
-                <th className={thClass}>Cost</th>
-                <th className={thClass}>Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {fuelLogs.map((f) => (
-                <tr key={f.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                  <td className={`${tdClass} font-medium`}>{f.vehicle?.registrationNumber}</td>
-                  <td className={tdClass}>{f.liters} L</td>
-                  <td className={tdClass}>₹{f.cost.toLocaleString()}</td>
-                  <td className={tdClass}>{format(new Date(f.date), 'dd MMM yyyy')}</td>
-                </tr>
-              ))}
-              {fuelLogs.length === 0 && (
+          {loading ? (
+            <SkeletonTable rows={5} cols={4} />
+          ) : (
+            <table className="w-full">
+              <thead className="border-b border-gray-200 dark:border-gray-800">
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">
-                    No fuel logs found.
-                  </td>
+                  <th className={thClass}>Vehicle</th>
+                  <th className={thClass}>Liters</th>
+                  <th className={thClass}>Cost</th>
+                  <th className={thClass}>Date</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <motion.tbody
+                variants={staggerContainer}
+                initial="initial"
+                animate="animate"
+                className="divide-y divide-gray-100 dark:divide-gray-800"
+              >
+                {fuelLogs.map((f) => (
+                  <motion.tr key={f.id} variants={staggerItem} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className={`${tdClass} font-medium`}>{f.vehicle?.registrationNumber}</td>
+                    <td className={tdClass}>{f.liters} L</td>
+                    <td className={tdClass}>₹{f.cost.toLocaleString()}</td>
+                    <td className={tdClass}>{format(new Date(f.date), 'dd MMM yyyy')}</td>
+                  </motion.tr>
+                ))}
+                {fuelLogs.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">
+                      No fuel logs found.
+                    </td>
+                  </tr>
+                )}
+              </motion.tbody>
+            </table>
+          )}
         </div>
       ) : (
         <div className={`${cardClass} overflow-x-auto`}>
-          <table className="w-full">
-            <thead className="border-b border-gray-200 dark:border-gray-800">
-              <tr>
-                <th className={thClass}>Vehicle</th>
-                <th className={thClass}>Type</th>
-                <th className={thClass}>Amount</th>
-                <th className={thClass}>Description</th>
-                <th className={thClass}>Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {expenses.map((e) => (
-                <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                  <td className={`${tdClass} font-medium`}>{e.vehicle?.registrationNumber}</td>
-                  <td className={tdClass}>{e.type}</td>
-                  <td className={tdClass}>₹{e.amount.toLocaleString()}</td>
-                  <td className={tdClass}>{e.description}</td>
-                  <td className={tdClass}>{format(new Date(e.date), 'dd MMM yyyy')}</td>
-                </tr>
-              ))}
-              {expenses.length === 0 && (
+          {loading ? (
+            <SkeletonTable rows={5} cols={5} />
+          ) : (
+            <table className="w-full">
+              <thead className="border-b border-gray-200 dark:border-gray-800">
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">
-                    No expenses found.
-                  </td>
+                  <th className={thClass}>Vehicle</th>
+                  <th className={thClass}>Type</th>
+                  <th className={thClass}>Amount</th>
+                  <th className={thClass}>Description</th>
+                  <th className={thClass}>Date</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <motion.tbody
+                variants={staggerContainer}
+                initial="initial"
+                animate="animate"
+                className="divide-y divide-gray-100 dark:divide-gray-800"
+              >
+                {expenses.map((e) => (
+                  <motion.tr key={e.id} variants={staggerItem} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className={`${tdClass} font-medium`}>{e.vehicle?.registrationNumber}</td>
+                    <td className={tdClass}>{e.type}</td>
+                    <td className={tdClass}>₹{e.amount.toLocaleString()}</td>
+                    <td className={tdClass}>{e.description}</td>
+                    <td className={tdClass}>{format(new Date(e.date), 'dd MMM yyyy')}</td>
+                  </motion.tr>
+                ))}
+                {expenses.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">
+                      No expenses found.
+                    </td>
+                  </tr>
+                )}
+              </motion.tbody>
+            </table>
+          )}
         </div>
       )}
 

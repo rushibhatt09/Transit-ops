@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Plus, Search, Pencil, Trash2, ArrowUpDown, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
@@ -7,7 +8,8 @@ import { Driver } from '../types'
 import { useAuth } from '../context/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import Modal from '../components/Modal'
-import { primaryBtn, secondaryBtn, inputClass, labelClass, cardClass, thClass, tdClass } from '../components/ui'
+import { SkeletonTable } from '../components/Skeleton'
+import { primaryBtn, secondaryBtn, inputClass, labelClass, cardClass, thClass, tdClass, staggerContainer, staggerItem } from '../components/ui'
 
 const STATUS_OPTIONS = ['AVAILABLE', 'ON_TRIP', 'OFF_DUTY', 'SUSPENDED']
 
@@ -34,9 +36,13 @@ export default function Drivers() {
   const [editing, setEditing] = useState<Driver | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   function load() {
-    api.get<Driver[]>('/drivers').then((res) => setDrivers(res.data))
+    api.get<Driver[]>('/drivers').then((res) => {
+      setDrivers(res.data)
+      setLoading(false)
+    })
   }
   useEffect(load, [])
 
@@ -128,9 +134,9 @@ export default function Drivers() {
           <p className="text-sm text-gray-500 dark:text-gray-400">Profiles, licenses, and safety compliance</p>
         </div>
         {user?.role === 'FLEET_MANAGER' && (
-          <button onClick={openCreate} className={primaryBtn}>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={openCreate} className={primaryBtn}>
             <Plus size={16} /> Add Driver
-          </button>
+          </motion.button>
         )}
       </div>
 
@@ -150,73 +156,77 @@ export default function Drivers() {
       </div>
 
       <div className={`${cardClass} overflow-x-auto`}>
-        <table className="w-full">
-          <thead className="border-b border-gray-200 dark:border-gray-800">
-            <tr>
-              <th className={thClass}>
-                <button onClick={() => toggleSort('name')} className="flex items-center gap-1">
-                  Name <ArrowUpDown size={12} />
-                </button>
-              </th>
-              <th className={thClass}>License Number</th>
-              <th className={thClass}>Category</th>
-              <th className={thClass}>
-                <button onClick={() => toggleSort('licenseExpiry')} className="flex items-center gap-1">
-                  License Expiry <ArrowUpDown size={12} />
-                </button>
-              </th>
-              <th className={thClass}>Contact</th>
-              <th className={thClass}>
-                <button onClick={() => toggleSort('safetyScore')} className="flex items-center gap-1">
-                  Safety Score <ArrowUpDown size={12} />
-                </button>
-              </th>
-              <th className={thClass}>Status</th>
-              {canWrite && <th className={thClass}>Actions</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {filtered.map((d) => (
-              <tr key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                <td className={`${tdClass} font-medium`}>{d.name}</td>
-                <td className={tdClass}>{d.licenseNumber}</td>
-                <td className={tdClass}>{d.licenseCategory}</td>
-                <td className={tdClass}>
-                  <span className={`flex items-center gap-1 ${isExpired(d) ? 'text-red-500 font-medium' : ''}`}>
-                    {isExpired(d) && <AlertTriangle size={13} />}
-                    {format(new Date(d.licenseExpiry), 'dd MMM yyyy')}
-                  </span>
-                </td>
-                <td className={tdClass}>{d.contactNumber}</td>
-                <td className={tdClass}>{d.safetyScore}</td>
-                <td className={tdClass}>
-                  <StatusBadge status={d.status} />
-                </td>
-                {canWrite && (
-                  <td className={tdClass}>
-                    <div className="flex gap-2">
-                      <button onClick={() => openEdit(d)} className="text-gray-500 hover:text-brand-600">
-                        <Pencil size={16} />
-                      </button>
-                      {canDelete && (
-                        <button onClick={() => handleDelete(d)} className="text-gray-500 hover:text-red-600">
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {filtered.length === 0 && (
+        {loading ? (
+          <SkeletonTable rows={5} cols={7} />
+        ) : (
+          <table className="w-full">
+            <thead className="border-b border-gray-200 dark:border-gray-800">
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">
-                  No drivers found.
-                </td>
+                <th className={thClass}>
+                  <button onClick={() => toggleSort('name')} className="flex items-center gap-1">
+                    Name <ArrowUpDown size={12} />
+                  </button>
+                </th>
+                <th className={thClass}>License Number</th>
+                <th className={thClass}>Category</th>
+                <th className={thClass}>
+                  <button onClick={() => toggleSort('licenseExpiry')} className="flex items-center gap-1">
+                    License Expiry <ArrowUpDown size={12} />
+                  </button>
+                </th>
+                <th className={thClass}>Contact</th>
+                <th className={thClass}>
+                  <button onClick={() => toggleSort('safetyScore')} className="flex items-center gap-1">
+                    Safety Score <ArrowUpDown size={12} />
+                  </button>
+                </th>
+                <th className={thClass}>Status</th>
+                {canWrite && <th className={thClass}>Actions</th>}
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <motion.tbody variants={staggerContainer} initial="initial" animate="animate" className="divide-y divide-gray-100 dark:divide-gray-800">
+              {filtered.map((d) => (
+                <motion.tr key={d.id} variants={staggerItem} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <td className={`${tdClass} font-medium`}>{d.name}</td>
+                  <td className={tdClass}>{d.licenseNumber}</td>
+                  <td className={tdClass}>{d.licenseCategory}</td>
+                  <td className={tdClass}>
+                    <span className={`flex items-center gap-1 ${isExpired(d) ? 'text-red-500 font-medium' : ''}`}>
+                      {isExpired(d) && <AlertTriangle size={13} />}
+                      {format(new Date(d.licenseExpiry), 'dd MMM yyyy')}
+                    </span>
+                  </td>
+                  <td className={tdClass}>{d.contactNumber}</td>
+                  <td className={tdClass}>{d.safetyScore}</td>
+                  <td className={tdClass}>
+                    <StatusBadge status={d.status} />
+                  </td>
+                  {canWrite && (
+                    <td className={tdClass}>
+                      <div className="flex gap-2">
+                        <button onClick={() => openEdit(d)} className="text-gray-500 hover:text-brand-600">
+                          <Pencil size={16} />
+                        </button>
+                        {canDelete && (
+                          <button onClick={() => handleDelete(d)} className="text-gray-500 hover:text-red-600">
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </motion.tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">
+                    No drivers found.
+                  </td>
+                </tr>
+              )}
+            </motion.tbody>
+          </table>
+        )}
       </div>
 
       {modalOpen && (

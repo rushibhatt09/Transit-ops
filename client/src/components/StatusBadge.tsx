@@ -13,9 +13,25 @@ const COLORS: Record<string, string> = {
   CLOSED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
 }
 
+const DOT_COLORS: Record<string, string> = {
+  ON_TRIP: 'bg-blue-500',
+  DISPATCHED: 'bg-blue-500',
+}
+
+const LIVE_STATES = new Set(['ON_TRIP', 'DISPATCHED'])
+
 export default function StatusBadge({ status }: { status: string }) {
+  const isLive = LIVE_STATES.has(status)
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${COLORS[status] || 'bg-gray-100 text-gray-600'}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${COLORS[status] || 'bg-gray-100 text-gray-600'}`}
+    >
+      {isLive && (
+        <span className="relative flex h-1.5 w-1.5">
+          <span className={`absolute inline-flex h-full w-full rounded-full ${DOT_COLORS[status]} animate-pulse-ring`} />
+          <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${DOT_COLORS[status]}`} />
+        </span>
+      )}
       {status.replace('_', ' ')}
     </span>
   )
